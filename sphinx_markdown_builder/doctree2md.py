@@ -349,6 +349,8 @@ class Translator(nodes.NodeVisitor):
         # Flag for whether to escape characters
         self._escape_text = True
 
+        self._field = ''
+
     def astext(self):
         """Return the final formatted document as a string."""
         parts = [''.join(lines).strip() for lines in self._lists.values()]
@@ -448,16 +450,30 @@ class Translator(nodes.NodeVisitor):
     def depart_definition(self, node):
         self.finish_level()
 
-    visit_field_body = visit_definition
+    #visit_field_body = visit_definition
 
-    depart_field_body = depart_definition
+    #depart_field_body = depart_definition
 
     def visit_paragraph(self, node):
+        if self._field == 'Parameters':
+            body = node.astext()
+            tokens = body.split(' – ')
+            k = tokens[0]
+            v = ' – '.join(tokens[1:])
+            v = v.replace('\n', '<br/>')
+            self.add('|{}|{}|'.format(k, v))
+            raise nodes.SkipNode
+        elif self._field == 'Returns':
+            self.add('|{}|'.format(node.astext()))
+            raise nodes.SkipNode
+        elif self._field == 'table':
+            raise nodes.SkipNode
         pass
 
     def depart_paragraph(self, node):
-        self.ensure_eol()
-        self.add('\n')
+        if self._field == '':
+            self.ensure_eol()
+            self.add('\n')
 
     def visit_math_block(self, node):
         # docutils math block
@@ -525,11 +541,15 @@ class Translator(nodes.NodeVisitor):
         self.list_prefixes.pop()
 
     def visit_bullet_list(self, node):
+        if self._field != '':
+            pass
         self.list_prefixes.append('* ')
 
     depart_bullet_list = depart_enumerated_list
 
     def visit_list_item(self, node):
+        if self._field != '':
+            pass
         first_prefix = self.list_prefixes[-1]
         prefix = ' ' * len(first_prefix)
         self.start_level(prefix, first_prefix)

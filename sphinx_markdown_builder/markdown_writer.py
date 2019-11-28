@@ -87,13 +87,11 @@ class MarkdownTranslator(Translator):
 
     def visit_desc_signature(self, node):
         # the main signature of class/method
-        # We dont want methods to be at the same level as classes,
-        # If signature has a non null class, thats means it is a signature
-        # of a class method
+        # We dont want methods to be at the same level as classes
         if ("class" in node.attributes and node.attributes["class"]):
-            self.add('\n#### ')
-        else:
             self.add('\n### ')
+        else:
+            self.add('\n#### ')
 
     def depart_desc_signature(self, node):
         # the main signature of class/method
@@ -125,29 +123,48 @@ class MarkdownTranslator(Translator):
     #
 
     def visit_field_list(self, node):
+        self._in_field_list = True
         pass
 
     def depart_field_list(self, node):
+        self._in_field_list = False
         pass
 
     def visit_field(self, node):
         self.add('\n')
 
     def depart_field(self, node):
+        self._field = ''
         self.add('\n')
 
     def visit_field_name(self, node):
         # field name, e.g 'returns', 'parameters'
-        self.add('* **')
+        #self.add('* **')
+        self._field = node.astext()
+        self.add('|')
 
     def depart_field_name(self, node):
-        self.add('**')
+        self.add('|')
+        if self._field == 'Parameters':
+            self.add('description|')
+        self.add('\n|---|')
+        if self._field == 'Parameters':
+            self.add('---|')
+        self.add('\n')
+
+    def visit_field_body(self, node):
+        pass
+
+    def depart_field_body(self, node):
+        pass
 
     def visit_literal_strong(self, node):
         self.add('**')
 
     def depart_literal_strong(self, node):
         self.add('**')
+        if self._in_field_list:
+            self.add('|')
 
     def visit_literal_emphasis(self, node):
         self.add('*')
@@ -251,10 +268,13 @@ class MarkdownTranslator(Translator):
         self.ascend('raw')
 
     def visit_table(self, node):
+        self._field = 'table'
         self.tables.append(node)
 
     def depart_table(self, node):
         self.tables.pop()
+        self._field = ''
+        self.add('\n')
 
     def visit_tabular_col_spec(self, node):
         pass
@@ -303,12 +323,11 @@ class MarkdownTranslator(Translator):
     def visit_row(self, node):
         if not len(self.theads) and not len(self.tbodys):
             raise nodes.SkipNode
+        self.table_entries = []
         self.table_rows.append(node)
 
     def depart_row(self, node):
         self.add('|\n')
-        if not len(self.theads):
-            self.table_entries = []
 
     def visit_enumerated_list(self, node):
         self.depth.descend('list')
@@ -338,16 +357,20 @@ class MarkdownTranslator(Translator):
             else:
                 self.enumerated_count[depth] = self.enumerated_count[depth] + 1
             marker = str(self.enumerated_count[depth]) + '.'
-        self.add('\n' + depth_padding + marker + ' ')
+        if self._field == '':
+            self.add('\n' + depth_padding + marker + ' ')
 
     def depart_list_item(self, node):
+        if self._field != '':
+            self.add('\n')
+            pass
         self.depth.ascend('list_item')
 
     def visit_entry(self, node):
         if not len(self.table_rows):
             raise nodes.SkipNode
         self.table_entries.append(node)
-        self.add('| ')
+        self.add('| {}'.format(node.astext().replace('\n', '')))
 
     def depart_entry(self, node):
         length = 0
